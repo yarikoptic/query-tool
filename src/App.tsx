@@ -20,7 +20,7 @@ import './App.css';
 function App() {
   const [diagnosisOptions, setDiagnosisOptions] = useState<AttributeOption[]>([]);
   const [assessmentOptions, setAssessmentOptions] = useState<AttributeOption[]>([]);
-  const [nodeOptions, setNodeOptions] = useState<NodeOption[]>([
+  const [availableNodes, setAvailableNodes] = useState<NodeOption[]>([
     { NodeName: 'All', ApiURL: 'allNodes' },
   ]);
 
@@ -30,7 +30,6 @@ function App() {
 
   const [result, setResult] = useState<Result[] | null>(null);
 
-  const [node, setNode] = useState<FieldInput>([{ label: 'All', id: 'allNodes' }]);
   const [minAge, setMinAge] = useState<number | null>(null);
   const [maxAge, setMaxAge] = useState<number | null>(null);
   const [sex, setSex] = useState<FieldInput>(null);
@@ -39,9 +38,15 @@ function App() {
   const [minNumSessions, setMinNumSessions] = useState<number | null>(null);
   const [assessmentTool, setAssessmentTool] = useState<FieldInput>(null);
   const [imagingModality, setImagingModality] = useState<FieldInput>(null);
+  // holds the same state as node
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const selectedNodes: FieldInputOption[] = availableNodes
+    .filter((node) => searchParams.getAll('node').includes(node.NodeName))
+    .map((node) => ({ label: node.NodeName, id: node.ApiURL }));
+
   useEffect(() => {
+    console.log('Hello from fetcher 1')
     async function tryThisOptionsGetter(dataElementURI: string) {
       try {
         const response: AxiosResponse<RetrievedAttributeOption> = await axios.get(
@@ -91,52 +96,24 @@ function App() {
         } else if (nodeResponse.length === 0) {
           enqueueSnackbar('No options found for Node', { variant: 'info' });
         } else {
-          setNodeOptions([...nodeResponse, { NodeName: 'All', ApiURL: 'allNodes' }]);
+          setAvailableNodes([...nodeResponse, { NodeName: 'All', ApiURL: 'allNodes' }]);
+          if (searchParams.getAll('node').length !== 0) {
+            const validNodes = searchParams.getAll('node').filter((nodeName) => nodeResponse.some((node) => node.NodeName === nodeName));
+            if (validNodes.length > 0) {
+              setSearchParams({ node: validNodes });
+            }
+          } else {
+            setSearchParams({ node: ['All'] });
+          }
         }
       });
     }
 
-  }, []);  
-
-  useEffect(() => {
-    if (nodeOptions.length > 1) {
-      const searchParamNodes: string[] = searchParams.getAll('node');
-      if (searchParamNodes) {
-        const matchedOptions: FieldInputOption[] = searchParamNodes
-          .map((nodeName) => {
-            const foundOption = nodeOptions.find((option) => option.NodeName === nodeName);
-            return foundOption ? { label: nodeName, id: foundOption.ApiURL } : { label: nodeName, id: '' };
-          })
-          .filter((option) => option.id !== '');
-        // If there is no node in the search params, set it to All
-        if (matchedOptions.length === 0) {
-          setSearchParams({ node: ['All'] });
-          setNode([{ label: 'All', id: 'allNodes' }]);
-        }
-        // If there is any node besides All selected, remove All from the list
-        else if (
-          matchedOptions.length > 1 &&
-          matchedOptions.some((option) => option.id === 'allNodes')
-        ) {
-          const filteredNode: FieldInputOption[] = matchedOptions.filter(
-            (n) => n.id !== 'allNodes'
-          );
-          setNode(filteredNode);
-          setSearchParams({ node: filteredNode.map((n) => n.label) });
-        } else {
-          setNode(matchedOptions);
-        }
-      }
-    }
-  }, [searchParams, setSearchParams, nodeOptions, node]);
+  }, [searchParams, setSearchParams]);
 
   function showAlert() {
-    if (node && Array.isArray(node)) {
-      const openNeuroIsAnOption = nodeOptions.find((n) => n.NodeName === 'OpenNeuro');
-      const isOpenNeuroSelected = node.find(
-        (n) => n.label === 'OpenNeuro' || (n.label === 'All' && openNeuroIsAnOption)
-      );
-      return isOpenNeuroSelected && !alertDismissed;
+    if (availableNodes.some((n) => n.NodeName === 'OpenNeuro') && selectedNodes.some((n) => n.label === 'OpenNeuro' || 'All')) {
+      return !alertDismissed;
     }
     return alertDismissed;
   }
@@ -144,9 +121,14 @@ function App() {
   function updateCategoricalQueryParams(fieldLabel: string, value: FieldInput) {
     switch (fieldLabel) {
       case 'Neurobagel graph':
-        setNode(value);
         if (Array.isArray(value)) {
-          setSearchParams({ node: value.map((n) => n.label) });
+          if (value.length === 0) {
+            setSearchParams({ node: ['All'] });
+          } else if (value.length > 1) {
+            setSearchParams({ node: value.filter((n) => n.label !== 'All').map((n) => n.label) });
+          } else {
+            setSearchParams({ node: value.map((n) => n.label) });
+          }
         }
         break;
       case 'Sex':
@@ -214,7 +196,7 @@ function App() {
   function constructQueryURL() {
     const queryParams = new URLSearchParams();
 
-    setQueryParam('node_url', node, queryParams);
+    setQueryParam('node_url', selectedNodes, queryParams);
     queryParams.set('min_age', minAge ? minAge.toString() : '');
     queryParams.set('max_age', maxAge ? maxAge.toString() : '');
     setQueryParam('sex', sex, queryParams);
@@ -287,10 +269,10 @@ function App() {
       <div className="grid grid-cols-4 grid-rows-1 gap-4">
         <div>
           <QueryForm
-            nodeOptions={nodeOptions}
+            nodeOptions={availableNodes}
             diagnosisOptions={diagnosisOptions}
             assessmentOptions={assessmentOptions}
-            node={node}
+            node={selectedNodes}
             minAge={minAge}
             maxAge={maxAge}
             sex={sex}

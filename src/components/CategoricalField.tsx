@@ -1,5 +1,5 @@
 import { Autocomplete, TextField } from '@mui/material';
-import { CategoricalFieldProps } from '../utils/types';
+import { CategoricalFieldProps, FieldInputOption } from '../utils/types';
 
 function CategoricalField({
   label,
@@ -8,6 +8,16 @@ function CategoricalField({
   multiple,
   inputValue,
 }: CategoricalFieldProps) {
+  function handleSelectionChange(value: FieldInputOption | FieldInputOption[] | null): void {
+    if (value === null) {
+      onFieldChange(label, null);
+    }
+    else if (!Array.isArray(value)) {
+      onFieldChange(label, [value]);
+    } else {
+      onFieldChange(label, value);
+  }
+  }
   return (
     <Autocomplete
       options={options.sort((a, b) => a.label.localeCompare(b.label))}
@@ -23,7 +33,7 @@ function CategoricalField({
         />
       )}
       multiple={multiple}
-      onChange={(_, value) => onFieldChange(label, value)}
+      onChange={(_, value) => handleSelectionChange(value)}
     />
   );
 }
