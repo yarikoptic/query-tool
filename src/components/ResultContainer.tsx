@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Button, FormControlLabel, Checkbox, Typography } from '@mui/material';
 import ResultCard from './ResultCard';
 import { Result } from '../utils/types';
@@ -6,6 +6,9 @@ import DownloadResultButton from './DownloadResultButton';
 import NBDialog from './NBDialog';
 
 function ResultContainer({ result }: { result: Result[] | null }) {
+
+  const MemoizedResultCard = memo(ResultCard);
+
   const [download, setDownload] = useState<string[]>([]);
   const [openModal, setOpenModal] = useState(false);
   const selectAll: boolean = result
@@ -48,6 +51,7 @@ function ResultContainer({ result }: { result: Result[] | null }) {
   }
 
   useEffect(() => {
+    console.log('result fired');
     if (result) {
       setDownload((currentDownload) =>
         currentDownload.filter((downloadID) =>
@@ -187,7 +191,7 @@ function ResultContainer({ result }: { result: Result[] | null }) {
         </div>
         <div className="col-span-4 max-h-96 space-y-2 overflow-auto">
           {result.map((item) => (
-            <ResultCard
+            <MemoizedResultCard
               key={item.dataset_uuid}
               nodeName={item.node_name}
               datasetUUID={item.dataset_uuid}
